@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商场停车无感扣费异常复核平台</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">无感扣费<span class="dot">●</span>异常复核平台</div>
+  <div class="sub">青澜中央广场 · 数据均为虚构演示</div>
+  <div class="spacer"></div>
+  <div id="loggedOut" class="login-box">
+    <select id="quickAccount">
+      <option value="admin|admin123">贺衡 · 管理员 ADMIN</option>
+      <option value="fang|op123">方屿 · 岗亭员 OPERATOR</option>
+      <option value="shen|au123">申澄 · 稽核员 AUDITOR（只读）</option>
+      <option value="qian|fi123">钱泊 · 财务员 FINANCE</option>
+    </select>
+    <input id="loginUser" value="admin" size="9" aria-label="工号">
+    <input id="loginPass" value="admin123" size="9" type="password" aria-label="口令">
+    <button id="btnLogin">登录</button>
+  </div>
+  <div id="loggedIn" class="who hidden">
+    <b id="whoName"></b><span id="whoRole" class="rolechip"></span>
+    <button class="ghost" id="btnLogout" style="margin-left:10px">退出</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <div class="tab active" data-view="lanes">车道监控</div>
+  <div class="tab" data-view="records">停车记录</div>
+  <div class="tab" data-view="cases">异常队列<span class="n zero" id="tabCasesN">0</span></div>
+  <div class="tab" data-view="rules">规则版本</div>
+  <div class="tab" data-view="releases">人工放行</div>
+  <div class="tab" data-view="refunds">退款台账</div>
+</nav>
+
+<main>
+  <!-- ============================== 车道监控 ============================== -->
+  <section id="view-lanes">
+    <div class="stats" id="statsBar"></div>
+    <div id="lotsWrap"></div>
+    <div class="panel">
+      <div class="panel-h"><h2>车道设备消息</h2>
+        <span class="hint">点击车道带筛选；消息严格按车道设备时间排序</span>
+        <div class="filterbar">
+          <select id="msgLane"></select>
+        </div>
+      </div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>设备时间</th><th>方向</th><th>识别车牌</th><th>置信度</th>
+            <th>消息 UID（去重键）</th><th>处理</th></tr></thead>
+          <tbody id="msgBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== 停车记录 ============================== -->
+  <section id="view-records" class="hidden">
+    <div class="panel">
+      <div class="panel-h"><h2>停车记录</h2>
+        <span class="hint">按入场时间 → 结算时间排列；金额列为固定宽度</span>
+        <div class="filterbar">
+          <select id="recFilter">
+            <option value="">全部状态</option>
+            <option value="INSIDE">在场内</option>
+            <option value="PAID">已支付</option>
+            <option value="REVIEW_HOLD">待复核拦截</option>
+            <option value="MANUAL_RELEASED">人工放行</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>#</th><th>车牌</th><th>入场时间</th><th>入场车道</th>
+            <th>出场时间</th><th>出场车道</th><th>时长</th><th class="num">金额</th>
+            <th>规则快照</th><th>状态</th><th>异常</th></tr></thead>
+          <tbody id="recBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== 异常队列 ============================== -->
+  <section id="view-cases" class="hidden">
+    <div class="panel">
+      <div class="panel-h"><h2>异常复核队列</h2>
+        <span class="hint">短标签用于速览，完整文字说明案件经过</span>
+        <div class="filterbar">
+          <select id="caseFilter">
+            <option value="">全部</option>
+            <option value="OPEN">待处理</option>
+            <option value="RESOLVED">已处理</option>
+            <option value="REJECTED">已驳回</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>案件号</th><th>车牌/会话</th><th>异常</th><th>完整说明</th>
+            <th>订单</th><th class="num">金额</th><th>状态</th><th>处理</th></tr></thead>
+          <tbody id="caseBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== 规则版本 ============================== -->
+  <section id="view-rules" class="hidden">
+    <div class="panel">
+      <div class="panel-h"><h2>计费规则版本台账</h2>
+        <span class="hint">按入场时的生效版本计费；已结算订单保存快照，不随后续版本重算</span></div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>停车场</th><th>版本</th><th>生效起</th><th>生效止</th>
+            <th>免费时长</th><th>计费单位</th><th class="num">单价</th><th class="num">自然日封顶</th>
+            <th>备注</th></tr></thead>
+          <tbody id="ruleBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel" id="newRulePanel">
+      <div class="panel-h"><h2>登记新版本（仅 ADMIN）</h2></div>
+      <div class="panel-b">
+        <div class="form-grid">
+          <label class="field">停车场<select id="nrLot"></select></label>
+          <label class="field">生效时间<input id="nrFrom" value="2026-11-01T00:00:00+08:00"></label>
+          <label class="field">免费时长（分钟）<input id="nrFree" type="number" value="20"></label>
+          <label class="field">计费单位（分钟）<input id="nrUnit" type="number" value="30"></label>
+          <label class="field">单价（分/单位）<input id="nrPrice" type="number" value="300"></label>
+          <label class="field">自然日封顶（分，0 不封顶）<input id="nrCap" type="number" value="6000"></label>
+          <label class="field wide">备注<input id="nrNote" placeholder="例如：冬季促销口径"></label>
+          <div class="wide"><button id="btnNewRule">登记新版本</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== 人工放行 ============================== -->
+  <section id="view-releases" class="hidden">
+    <div class="panel">
+      <div class="panel-h"><h2>人工放行台账</h2>
+        <span class="hint">每条放行必须选择原因、填写说明并关联本地识别证据文件</span></div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>放行单号</th><th>时间</th><th>车牌</th><th>车道</th>
+            <th>原因（短标签）</th><th>完整说明</th><th>证据文件</th><th>操作人</th></tr></thead>
+          <tbody id="releaseBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== 退款台账 ============================== -->
+  <section id="view-refunds" class="hidden">
+    <div class="panel">
+      <div class="panel-h"><h2>退款台账</h2>
+        <span class="hint">同一订单仅允许退款一次，重复提交幂等返回原退款单（仅 ADMIN/FINANCE）</span></div>
+      <div class="panel-b" style="padding:0">
+        <table>
+          <thead><tr><th>退款单号</th><th>时间</th><th>订单号</th><th>车牌</th>
+            <th class="num">退款金额</th><th>原因</th><th>操作人</th><th>通道</th></tr></thead>
+          <tbody id="refundBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 会话/案件详情抽屉 -->
+<div class="drawer-mask" id="mask"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-h"><span id="drawerTitle">详情</span><span class="x" id="drawerX">✕</span></div>
+  <div class="drawer-b" id="drawerBody"></div>
+</aside>
+
+<div class="toast" id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
